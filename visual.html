@@ -595,7 +595,7 @@ function loadFile(e) {
 }
 
 // mouse tracking on screen
-screenEl.addEventListener('mousemove', e => {
+screenEl.addEventListener('click', e => {
   const rect = screenEl.getBoundingClientRect();
   const cellW = rect.width / SCREEN_W;
   const cellH = rect.height / SCREEN_H;
