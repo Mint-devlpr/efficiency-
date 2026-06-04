@@ -9,17 +9,17 @@
 
 :root {
   --cyan: #22f3da;
-  --cyan-dim: #22f3da18;
-  --cyan-mid: #22f3da44;
-  --cyan-bright: #22f3dacc;
+  --cyan-dim: #22f3da2a;
+  --cyan-mid: #22f3da77;
+  --cyan-bright: #22f3daee;
   --bg: #000000;
   --bg2: #050505;
   --bg3: #0a0a0a;
-  --border: #22f3da22;
-  --border-bright: #22f3da55;
+  --border: #22f3da33;
+  --border-bright: #22f3da88;
   --text: #22f3da;
-  --text-dim: #22f3da66;
-  --text-dimmer: #22f3da33;
+  --text-dim: #22f3da99;
+  --text-dimmer: #22f3da55;
   --red: #ff3c3c;
   --yellow: #ffe94d;
 }
@@ -51,8 +51,8 @@ body::before {
     0deg,
     transparent,
     transparent 2px,
-    rgba(0,0,0,0.18) 2px,
-    rgba(0,0,0,0.18) 4px
+    rgba(0,0,0,0.08) 2px,
+    rgba(0,0,0,0.08) 4px
   );
   pointer-events: none;
   z-index: 9998;
@@ -65,8 +65,8 @@ body::after {
   top: 0; left: 0; right: 0; bottom: 0;
   background: radial-gradient(
     ellipse at center,
-    transparent 50%,
-    rgba(0,0,0,0.92) 100%
+    transparent 60%,
+    rgba(0,0,0,0.7) 100%
   );
   pointer-events: none;
   z-index: 9997;
@@ -320,7 +320,7 @@ input[type=range] {
 </head>
 <body>
 
-<div id="crt-scan" style="position:fixed;left:0;right:0;height:100px;background:linear-gradient(to bottom,transparent,rgba(34,243,218,0.015),transparent);pointer-events:none;z-index:9996;animation:scanmove 7s linear infinite;"></div>
+<div id="crt-scan" style="position:fixed;left:0;right:0;height:100px;background:linear-gradient(to bottom,transparent,rgba(34,243,218,0.04),transparent);pointer-events:none;z-index:9996;animation:scanmove 7s linear infinite;"></div>
 <div class="header">
   <span class="header-title">EFFICIENCY</span>
   <span class="header-sub">.mint8eff // 8 instructions // parasitic runtime</span>
