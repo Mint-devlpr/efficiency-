@@ -3,319 +3,385 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Efficiency — .mint8eff interpreter</title>
+<title>Efficiency — .mint8eff</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=VT323&family=Share+Tech+Mono&display=swap');
 
-  :root {
-    --bg: #0a0a0a;
-    --panel: #111111;
-    --border: #1e1e1e;
-    --mint: #00ffb3;
-    --mint-dim: #00ffb322;
-    --mint-mid: #00ffb366;
-    --red: #ff3c3c;
-    --yellow: #ffe94d;
-    --text: #c8c8c8;
-    --dim: #444;
-  }
+:root {
+  --cyan: #22f3da;
+  --cyan-dim: #22f3da18;
+  --cyan-mid: #22f3da44;
+  --cyan-bright: #22f3dacc;
+  --bg: #000000;
+  --bg2: #050505;
+  --bg3: #0a0a0a;
+  --border: #22f3da22;
+  --border-bright: #22f3da55;
+  --text: #22f3da;
+  --text-dim: #22f3da66;
+  --text-dimmer: #22f3da33;
+  --red: #ff3c3c;
+  --yellow: #ffe94d;
+}
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Share Tech Mono', monospace;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+html, body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  height: 100%;
+  min-height: 100vh;
+}
 
-  header {
-    padding: 24px 32px 16px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-  }
+body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  height: 100vh;
+  animation: flicker 9s infinite;
+}
 
-  header h1 {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 2.4rem;
-    color: var(--mint);
-    letter-spacing: 4px;
-    line-height: 1;
-  }
+/* CRT scanlines */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.18) 2px,
+    rgba(0,0,0,0.18) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
 
-  header span {
-    color: var(--dim);
-    font-size: 0.8rem;
-    letter-spacing: 2px;
-  }
+/* CRT vignette */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: radial-gradient(
+    ellipse at center,
+    transparent 50%,
+    rgba(0,0,0,0.92) 100%
+  );
+  pointer-events: none;
+  z-index: 9997;
+}
 
-  .workspace {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto 1fr;
-    flex: 1;
-    gap: 0;
-  }
+@keyframes flicker {
+  0%   { opacity: 1; }
+  2%   { opacity: 0.92; }
+  4%   { opacity: 1; }
+  19%  { opacity: 1; }
+  21%  { opacity: 0.95; }
+  23%  { opacity: 1; }
+  57%  { opacity: 1; }
+  58%  { opacity: 0.94; }
+  59%  { opacity: 1; }
+  100% { opacity: 1; }
+}
 
-  .panel {
-    border-right: 1px solid var(--border);
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-  }
+@keyframes scanmove {
+  0%   { top: -100px; }
+  100% { top: 100vh; }
+}
 
-  .panel-label {
-    padding: 10px 16px;
-    font-size: 0.7rem;
-    letter-spacing: 3px;
-    color: var(--dim);
-    border-bottom: 1px solid var(--border);
-    text-transform: uppercase;
-  }
+/* header */
+.header {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-bright);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+  background: var(--bg);
+}
 
-  textarea {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    color: var(--mint);
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 1rem;
-    padding: 16px;
-    resize: none;
-    line-height: 1.8;
-    min-height: 220px;
-  }
+.header-title {
+  font-family: 'VT323', monospace;
+  font-size: 1.8rem;
+  color: var(--cyan);
+  letter-spacing: 4px;
+}
 
-  textarea::placeholder { color: var(--dim); }
+.header-sub {
+  color: var(--text-dim);
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+}
 
-  .controls {
-    padding: 12px 16px;
-    border-top: 1px solid var(--border);
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    flex-wrap: wrap;
-  }
+.header-right {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 
-  button {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 0.8rem;
-    letter-spacing: 2px;
-    padding: 8px 20px;
-    border: 1px solid var(--mint);
-    background: transparent;
-    color: var(--mint);
-    cursor: pointer;
-    text-transform: uppercase;
-    transition: all 0.15s;
-  }
+/* layout */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr auto;
+  flex: 1;
+  overflow: hidden;
+  height: calc(100vh - 45px);
+}
 
-  button:hover { background: var(--mint-dim); }
+/* panels */
+.panel {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
 
-  button.danger {
-    border-color: var(--red);
-    color: var(--red);
-  }
+.panel:last-child { border-right: none; }
 
-  button.danger:hover { background: #ff3c3c22; }
+.panel-header {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.65rem;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  background: var(--bg2);
+}
 
-  .speed-label {
-    color: var(--dim);
-    font-size: 0.7rem;
-    letter-spacing: 2px;
-    margin-left: auto;
-  }
+/* editor */
+#code {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--cyan);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.95rem;
+  padding: 12px;
+  resize: none;
+  line-height: 1.9;
+  overflow-y: auto;
+}
 
-  input[type=range] {
-    accent-color: var(--mint);
-    width: 80px;
-  }
+#code::placeholder { color: var(--text-dimmer); }
+#code::selection { background: var(--cyan-mid); }
 
-  /* memory panel */
-  #memory-panel {
-    border-right: none;
-    overflow-y: auto;
-  }
+/* controls */
+.controls {
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  background: var(--bg2);
+}
 
-  #memory-grid {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    flex: 1;
-    overflow-y: auto;
-  }
+.btn {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.7rem;
+  letter-spacing: 2px;
+  padding: 5px 14px;
+  border: 1px solid var(--cyan-mid);
+  background: transparent;
+  color: var(--cyan);
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.1s;
+}
 
-  .mem-cell {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 4px 8px;
-    border: 1px solid transparent;
-    transition: all 0.15s;
-    font-size: 0.85rem;
-  }
+.btn:hover {
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+}
 
-  .mem-cell.active {
-    border-color: var(--mint);
-    background: var(--mint-dim);
-  }
+.btn.red { border-color: #ff3c3c44; color: var(--red); }
+.btn.red:hover { background: #ff3c3c11; border-color: var(--red); }
+.btn.yellow { border-color: #ffe94d44; color: var(--yellow); }
+.btn.yellow:hover { background: #ffe94d11; border-color: var(--yellow); }
 
-  .mem-cell.changed {
-    border-color: var(--yellow);
-    background: #ffe94d11;
-  }
+.speed-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
 
-  .mem-addr {
-    color: var(--dim);
-    min-width: 48px;
-  }
+.speed-label { font-size: 0.65rem; color: var(--text-dim); letter-spacing: 1px; }
 
-  .mem-val {
-    color: var(--text);
-    flex: 1;
-  }
+input[type=range] {
+  width: 70px;
+  accent-color: var(--cyan);
+}
 
-  .mem-cell.active .mem-val { color: var(--mint); }
-  .mem-cell.changed .mem-val { color: var(--yellow); }
+/* memory */
+#mem-scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
 
-  .mem-ptr {
-    color: var(--mint);
-    font-size: 0.7rem;
-  }
+#mem-scroll::-webkit-scrollbar { width: 4px; }
+#mem-scroll::-webkit-scrollbar-track { background: transparent; }
+#mem-scroll::-webkit-scrollbar-thumb { background: var(--border-bright); }
 
-  /* log panel */
-  #log-panel {
-    grid-column: 1 / 3;
-    border-right: none;
-    border-bottom: none;
-    max-height: 200px;
-  }
+.mem-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  transition: all 0.12s;
+}
 
-  #log {
-    padding: 12px 16px;
-    overflow-y: auto;
-    max-height: 160px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
+.mem-cell.active {
+  border-color: var(--cyan);
+  background: var(--cyan-dim);
+}
 
-  .log-line {
-    font-size: 0.78rem;
-    line-height: 1.6;
-    color: var(--dim);
-  }
+.mem-cell.changed {
+  border-color: var(--yellow);
+  background: #ffe94d0a;
+}
 
-  .log-line.info { color: var(--text); }
-  .log-line.success { color: var(--mint); }
-  .log-line.error { color: var(--red); }
-  .log-line.step { color: #777; }
+.mem-addr { color: var(--text-dim); min-width: 44px; font-size: 0.75rem; }
+.mem-bar-wrap { flex: 1; height: 6px; background: var(--bg3); }
+.mem-bar { height: 100%; background: var(--cyan-mid); transition: width 0.15s; min-width: 2px; }
+.mem-cell.active .mem-bar { background: var(--cyan); }
+.mem-cell.changed .mem-bar { background: var(--yellow); }
+.mem-val { min-width: 60px; text-align: right; }
+.mem-cell.active .mem-val { color: var(--cyan); }
+.mem-cell.changed .mem-val { color: var(--yellow); }
+.mem-ptr { color: var(--cyan); font-size: 0.65rem; min-width: 20px; }
 
-  .ip-indicator {
-    color: var(--dim);
-    font-size: 0.7rem;
-    margin-left: auto;
-    padding: 10px 16px;
-    letter-spacing: 1px;
-  }
+/* status */
+.status {
+  padding: 5px 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 20px;
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  flex-shrink: 0;
+  background: var(--bg2);
+}
 
-  .status-bar {
-    display: flex;
-    align-items: center;
-    padding: 6px 16px;
-    border-top: 1px solid var(--border);
-    gap: 20px;
-    font-size: 0.7rem;
-    color: var(--dim);
-    letter-spacing: 1px;
-  }
+.status b { color: var(--cyan); font-weight: normal; }
 
-  .status-bar span { color: var(--text); }
+/* log panel */
+.log-panel {
+  grid-column: 1 / 3;
+  border-top: 1px solid var(--border-bright);
+  display: flex;
+  flex-direction: column;
+  max-height: 160px;
+  flex-shrink: 0;
+}
 
-  /* instruction ref */
-  .ref-panel {
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    overflow-y: auto;
-  }
+#log {
+  flex: 1;
+  overflow-y: auto;
+  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
 
-  .ref-row {
-    display: flex;
-    gap: 12px;
-    font-size: 0.75rem;
-    padding: 3px 0;
-    border-bottom: 1px solid #1a1a1a;
-  }
+#log::-webkit-scrollbar { width: 4px; }
+#log::-webkit-scrollbar-thumb { background: var(--border-bright); }
 
-  .ref-num {
-    color: var(--mint);
-    min-width: 20px;
-  }
+.log-line { color: var(--text-dimmer); }
+.log-line.info { color: var(--text-dim); }
+.log-line.success { color: var(--cyan); }
+.log-line.error { color: var(--red); }
 
-  .ref-desc { color: #888; }
+/* cursor blink */
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.cursor { display: inline-block; width: 8px; height: 14px; background: var(--cyan); animation: blink 1s step-end infinite; vertical-align: middle; margin-left: 2px; }
 
-  @keyframes flash {
-    0% { background: var(--mint-mid); }
-    100% { background: var(--mint-dim); }
-  }
-
-  .mem-cell.flash { animation: flash 0.3s ease-out; }
+/* file input hidden */
+#file-input { display: none; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>EFFICIENCY</h1>
-  <span>.mint8eff interpreter // 8 instructions // parasitic runtime</span>
-</header>
+<div id="crt-scan" style="position:fixed;left:0;right:0;height:100px;background:linear-gradient(to bottom,transparent,rgba(34,243,218,0.015),transparent);pointer-events:none;z-index:9996;animation:scanmove 7s linear infinite;"></div>
+<div class="header">
+  <span class="header-title">EFFICIENCY</span>
+  <span class="header-sub">.mint8eff // 8 instructions // parasitic runtime</span>
+  <div class="header-right">
+    <button class="btn yellow" onclick="saveFile()">SAVE .mint8eff</button>
+    <button class="btn yellow" onclick="document.getElementById('file-input').click()">LOAD .mint8eff</button>
+    <input type="file" id="file-input" accept=".mint8eff" onchange="loadFile(event)">
+  </div>
+</div>
 
-<div class="workspace">
+<div class="layout">
 
-  <!-- code editor -->
+  <!-- editor -->
   <div class="panel">
-    <div class="panel-label">program // .mint8eff</div>
-    <textarea id="code" placeholder="# write your efficiency program here
-# instructions 1-8, comments with #
-# anything else is a raw value loaded into memory
-# example: put 3 in cell 0, move up, put 5 in cell 1
-3 3 3
-1
-3 3 3 3 3"></textarea>
+    <div class="panel-header">
+      <span>program</span>
+      <span id="prog-info" style="color:var(--text-dimmer)">— values</span>
+    </div>
+    <textarea id="code" spellcheck="false" placeholder="# efficiency // .mint8eff
+# instructions 1-8
+# anything outside 1-8 = raw value loaded to memory
+# comments start with #
+
+# example: count up in cell 0 forever
+3
+5
+3
+6"></textarea>
     <div class="controls">
-      <button onclick="runFull()">▶ RUN</button>
-      <button onclick="stepOnce()">⏭ STEP</button>
-      <button onclick="resetAll()">↺ RESET</button>
-      <button class="danger" onclick="stopRun()">■ STOP</button>
-      <span class="speed-label">speed</span>
-      <input type="range" id="speed" min="1" max="500" value="100">
+      <button class="btn" onclick="runFull()">▶ RUN</button>
+      <button class="btn" onclick="stepOnce()">⏭ STEP</button>
+      <button class="btn" onclick="resetAll()">↺ RESET</button>
+      <button class="btn red" onclick="stopRun()">■ STOP</button>
+      <div class="speed-wrap">
+        <span class="speed-label">SPEED</span>
+        <input type="range" id="speed" min="1" max="500" value="150">
+      </div>
     </div>
   </div>
 
-  <!-- memory display -->
-  <div class="panel" id="memory-panel">
-    <div class="panel-label">memory state</div>
-    <div id="memory-grid"></div>
-    <div class="status-bar">
-      <div>IP <span id="stat-ip">0</span></div>
-      <div>PTR <span id="stat-ptr">0</span></div>
-      <div>STEPS <span id="stat-steps">0</span></div>
-      <div>MEM[PTR] <span id="stat-val">0</span></div>
+  <!-- memory -->
+  <div class="panel">
+    <div class="panel-header">
+      <span>memory state</span>
+      <span id="mem-info" style="color:var(--text-dimmer)">256 cells</span>
+    </div>
+    <div id="mem-scroll"></div>
+    <div class="status">
+      <span>IP <b id="s-ip">0</b></span>
+      <span>PTR <b id="s-ptr">0</b></span>
+      <span>MEM[PTR] <b id="s-val">0</b></span>
+      <span>STEPS <b id="s-steps">0</b></span>
+      <span style="margin-left:auto" id="s-state">READY</span>
     </div>
   </div>
 
   <!-- log -->
-  <div class="panel" id="log-panel">
-    <div class="panel-label" style="display:flex;justify-content:space-between">
-      <span>execution log</span>
-      <span style="cursor:pointer;padding-right:4px" onclick="clearLog()">clear</span>
+  <div class="log-panel">
+    <div class="panel-header">
+      <span>terminal log</span>
+      <span onclick="clearLog()" style="cursor:pointer;color:var(--text-dimmer)">[ clear ]</span>
     </div>
     <div id="log"></div>
   </div>
@@ -323,234 +389,222 @@
 </div>
 
 <script>
-  const MEMORY_SIZE = 256;
+const MEM_SIZE = 256;
+let memory = new Array(MEM_SIZE).fill(0n);
+let prevMemory = new Array(MEM_SIZE).fill(0n);
+let pointer = 0;
+let ip = 0;
+let program = [];
+let steps = 0;
+let running = false;
+let runInterval = null;
 
-  let memory = new Array(MEMORY_SIZE).fill(0n);
-  let pointer = 0;
-  let ip = 0;
-  let program = [];
-  let steps = 0;
-  let running = false;
-  let runInterval = null;
-  let prevMemory = new Array(MEMORY_SIZE).fill(0n);
+const INAMES = {
+  1:'PTR++', 2:'PTR--', 3:'MEM[PTR]++', 4:'MEM[PTR]--',
+  5:'LOOP[', 6:'LOOP]', 7:'JUMP→MEM[PTR]', 8:'BRANCH'
+};
 
-  const INSTRUCTIONS = {
-    1: 'PTR++',
-    2: 'PTR--',
-    3: 'MEM[PTR]++',
-    4: 'MEM[PTR]--',
-    5: 'LOOP START',
-    6: 'LOOP END',
-    7: 'JUMP → MEM[PTR]',
-    8: 'BRANCH (if/else jump)'
-  };
-
-  function parseProgram(src) {
-    const lines = src.split('\n');
-    const values = [];
-    for (let line of lines) {
-      const noComment = line.split('#')[0];
-      const tokens = noComment.trim().split(/\s+/).filter(t => t !== '');
-      for (let t of tokens) {
-        const n = parseInt(t, 10);
-        if (!isNaN(n)) values.push(BigInt(n));
-      }
+function parseProgram(src) {
+  const vals = [];
+  for (const line of src.split('\n')) {
+    const clean = line.split('#')[0];
+    for (const t of clean.trim().split(/\s+/)) {
+      if (t === '') continue;
+      const n = parseInt(t, 10);
+      if (!isNaN(n)) vals.push(BigInt(n));
     }
-    return values;
+  }
+  return vals;
+}
+
+function log(msg, type='info') {
+  const el = document.getElementById('log');
+  const d = document.createElement('div');
+  d.className = 'log-line ' + type;
+  d.textContent = '> ' + msg;
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+function clearLog() { document.getElementById('log').innerHTML = ''; }
+
+function setStatus(s) { document.getElementById('s-state').textContent = s; }
+
+function updateStats() {
+  document.getElementById('s-ip').textContent = ip;
+  document.getElementById('s-ptr').textContent = pointer;
+  document.getElementById('s-val').textContent = memory[pointer].toString();
+  document.getElementById('s-steps').textContent = steps;
+}
+
+function updateMemory() {
+  const el = document.getElementById('mem-scroll');
+  const toShow = new Set([pointer]);
+  for (let i = 0; i < MEM_SIZE; i++) if (memory[i] !== 0n) toShow.add(i);
+
+  const maxVal = memory.reduce((a,b) => b > a ? b : a, 1n);
+
+  el.innerHTML = '';
+  if (toShow.size === 0) {
+    el.innerHTML = '<div style="color:var(--text-dimmer);padding:12px;font-size:0.75rem">memory empty</div>';
+    return;
   }
 
-  function resetAll() {
+  for (const idx of Array.from(toShow).sort((a,b)=>a-b)) {
+    const cell = document.createElement('div');
+    cell.className = 'mem-cell';
+    if (idx === pointer) cell.classList.add('active');
+    else if (memory[idx] !== prevMemory[idx]) cell.classList.add('changed');
+
+    const pct = maxVal > 0n ? Number((memory[idx] * 100n) / maxVal) : 0;
+    cell.innerHTML =
+      `<span class="mem-addr">[${String(idx).padStart(3,'0')}]</span>` +
+      `<div class="mem-bar-wrap"><div class="mem-bar" style="width:${Math.max(pct,1)}%"></div></div>` +
+      `<span class="mem-val">${memory[idx]}</span>` +
+      `<span class="mem-ptr">${idx === pointer ? '◀' : ''}</span>`;
+    el.appendChild(cell);
+  }
+
+  document.getElementById('mem-info').textContent =
+    `${toShow.size} active / 256 cells`;
+}
+
+function updateProgInfo() {
+  document.getElementById('prog-info').textContent =
+    program.length > 0 ? `${program.length} values` : '— values';
+}
+
+function step() {
+  if (ip >= program.length) {
+    log('execution complete.', 'success');
+    setStatus('DONE');
     stopRun();
-    memory = new Array(MEMORY_SIZE).fill(0n);
-    prevMemory = new Array(MEMORY_SIZE).fill(0n);
-    pointer = 0;
-    ip = 0;
-    steps = 0;
-    program = [];
-    updateMemoryDisplay();
-    updateStats();
-    log('reset.', 'info');
+    return false;
   }
 
-  function log(msg, type = 'step') {
-    const el = document.getElementById('log');
-    const line = document.createElement('div');
-    line.className = `log-line ${type}`;
-    line.textContent = `> ${msg}`;
-    el.appendChild(line);
-    el.scrollTop = el.scrollHeight;
-  }
+  prevMemory = [...memory];
+  const instr = Number(program[ip]);
+  log(`[${ip}] ${INAMES[instr] || 'RAW ' + instr}`);
 
-  function clearLog() {
-    document.getElementById('log').innerHTML = '';
-  }
-
-  function updateStats() {
-    document.getElementById('stat-ip').textContent = ip;
-    document.getElementById('stat-ptr').textContent = pointer;
-    document.getElementById('stat-steps').textContent = steps;
-    document.getElementById('stat-val').textContent = memory[pointer].toString();
-  }
-
-  function updateMemoryDisplay() {
-    const grid = document.getElementById('memory-grid');
-    grid.innerHTML = '';
-
-    // show all non-zero cells plus pointer and neighbours
-    const toShow = new Set();
-    toShow.add(pointer);
-    for (let i = 0; i < MEMORY_SIZE; i++) {
-      if (memory[i] !== 0n) toShow.add(i);
-    }
-
-    if (toShow.size === 0) {
-      const empty = document.createElement('div');
-      empty.style.color = 'var(--dim)';
-      empty.style.padding = '12px';
-      empty.style.fontSize = '0.75rem';
-      empty.textContent = 'memory is empty';
-      grid.appendChild(empty);
-      return;
-    }
-
-    const sorted = Array.from(toShow).sort((a, b) => a - b);
-    for (let idx of sorted) {
-      const cell = document.createElement('div');
-      cell.className = 'mem-cell';
-      if (idx === pointer) cell.classList.add('active');
-      else if (memory[idx] !== prevMemory[idx]) cell.classList.add('changed');
-
-      cell.innerHTML = `
-        <span class="mem-addr">[${idx}]</span>
-        <span class="mem-val">${memory[idx].toString()}</span>
-        ${idx === pointer ? '<span class="mem-ptr">◀ PTR</span>' : ''}
-      `;
-      grid.appendChild(cell);
-    }
-  }
-
-  function step() {
-    if (ip >= program.length) {
-      log('execution complete.', 'success');
-      stopRun();
-      return false;
-    }
-
-    prevMemory = [...memory];
-    const instr = Number(program[ip]);
-
-    const instrName = INSTRUCTIONS[instr] || `RAW VALUE ${instr}`;
-    log(`[${ip}] ${instrName}`, 'step');
-
-    switch (instr) {
-      case 1:
-        pointer++;
-        if (pointer >= MEMORY_SIZE) { log('error: pointer out of bounds', 'error'); stopRun(); return false; }
-        ip++;
-        break;
-
-      case 2:
-        pointer--;
-        if (pointer < 0) { log('error: pointer out of bounds', 'error'); stopRun(); return false; }
-        ip++;
-        break;
-
-      case 3:
-        memory[pointer]++;
-        ip++;
-        break;
-
-      case 4:
-        memory[pointer]--;
-        ip++;
-        break;
-
-      case 5:
-        if (memory[pointer] === 0n) {
-          let depth = 1; ip++;
-          while (depth > 0 && ip < program.length) {
-            if (Number(program[ip]) === 5) depth++;
-            if (Number(program[ip]) === 6) depth--;
-            ip++;
-          }
-        } else { ip++; }
-        break;
-
-      case 6:
-        if (memory[pointer] !== 0n) {
-          let depth = 1; ip--;
-          while (depth > 0 && ip >= 0) {
-            if (Number(program[ip]) === 6) depth++;
-            if (Number(program[ip]) === 5) depth--;
-            ip--;
-          }
+  switch(instr) {
+    case 1:
+      pointer++;
+      if (pointer >= MEM_SIZE) { log('error: pointer overflow', 'error'); stopRun(); return false; }
+      ip++; break;
+    case 2:
+      pointer--;
+      if (pointer < 0) { log('error: pointer underflow', 'error'); stopRun(); return false; }
+      ip++; break;
+    case 3: memory[pointer]++; ip++; break;
+    case 4: memory[pointer]--; ip++; break;
+    case 5:
+      if (memory[pointer] === 0n) {
+        let d = 1; ip++;
+        while (d > 0 && ip < program.length) {
+          if (Number(program[ip]) === 5) d++;
+          if (Number(program[ip]) === 6) d--;
           ip++;
-        } else { ip++; }
-        break;
-
-      case 7:
-        ip = Number(memory[pointer]);
-        break;
-
-      case 8:
-        if (ip + 3 >= program.length) { log('error: instruction 8 needs 3 following values', 'error'); stopRun(); return false; }
-        if (memory[pointer] === program[ip + 1]) {
-          ip = Number(program[ip + 2]);
-        } else {
-          ip = Number(memory[pointer + Number(program[ip + 3])]);
         }
-        break;
-
-      default:
-        memory[pointer] = BigInt(instr);
+      } else ip++;
+      break;
+    case 6:
+      if (memory[pointer] !== 0n) {
+        let d = 1; ip--;
+        while (d > 0 && ip >= 0) {
+          if (Number(program[ip]) === 6) d++;
+          if (Number(program[ip]) === 5) d--;
+          ip--;
+        }
         ip++;
-        break;
-    }
-
-    steps++;
-    updateMemoryDisplay();
-    updateStats();
-    return true;
+      } else ip++;
+      break;
+    case 7:
+      ip = Number(memory[pointer]); break;
+    case 8:
+      if (ip + 3 >= program.length) { log('error: instruction 8 needs 3 values', 'error'); stopRun(); return false; }
+      if (memory[pointer] === program[ip+1]) ip = Number(program[ip+2]);
+      else ip = Number(memory[pointer + Number(program[ip+3])]);
+      break;
+    default:
+      memory[pointer] = BigInt(instr); ip++; break;
   }
 
-  function stepOnce() {
-    if (program.length === 0) {
-      program = parseProgram(document.getElementById('code').value);
-      log(`loaded ${program.length} values.`, 'info');
-    }
-    step();
-  }
-
-  function runFull() {
-    stopRun();
-    program = parseProgram(document.getElementById('code').value);
-    memory = new Array(MEMORY_SIZE).fill(0n);
-    prevMemory = new Array(MEMORY_SIZE).fill(0n);
-    pointer = 0;
-    ip = 0;
-    steps = 0;
-    log(`loaded ${program.length} values. running...`, 'info');
-    updateMemoryDisplay();
-    updateStats();
-
-    running = true;
-    const delay = () => 501 - parseInt(document.getElementById('speed').value);
-    runInterval = setInterval(() => {
-      if (!running) return;
-      const cont = step();
-      if (!cont) stopRun();
-    }, delay());
-  }
-
-  function stopRun() {
-    running = false;
-    if (runInterval) { clearInterval(runInterval); runInterval = null; }
-  }
-
-  // init
-  updateMemoryDisplay();
+  steps++;
+  updateMemory();
   updateStats();
-  log('efficiency interpreter ready. write .mint8eff code and run.', 'success');
+  return true;
+}
+
+function stepOnce() {
+  if (program.length === 0) {
+    program = parseProgram(document.getElementById('code').value);
+    updateProgInfo();
+    log(`loaded ${program.length} values.`, 'success');
+  }
+  step();
+}
+
+function runFull() {
+  stopRun();
+  program = parseProgram(document.getElementById('code').value);
+  memory = new Array(MEM_SIZE).fill(0n);
+  prevMemory = new Array(MEM_SIZE).fill(0n);
+  pointer = 0; ip = 0; steps = 0;
+  updateProgInfo();
+  log(`loaded ${program.length} values. running...`, 'success');
+  setStatus('RUNNING');
+  updateMemory(); updateStats();
+  running = true;
+  function tick() {
+    if (!running) return;
+    const cont = step();
+    if (cont) runInterval = setTimeout(tick, 501 - parseInt(document.getElementById('speed').value));
+  }
+  tick();
+}
+
+function resetAll() {
+  stopRun();
+  memory = new Array(MEM_SIZE).fill(0n);
+  prevMemory = new Array(MEM_SIZE).fill(0n);
+  pointer = 0; ip = 0; steps = 0; program = [];
+  updateMemory(); updateStats(); updateProgInfo();
+  setStatus('READY');
+  log('reset.', 'info');
+}
+
+function stopRun() {
+  running = false;
+  if (runInterval) { clearTimeout(runInterval); runInterval = null; }
+  setStatus('STOPPED');
+}
+
+function saveFile() {
+  const code = document.getElementById('code').value;
+  const blob = new Blob([code], {type: 'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'program.mint8eff';
+  a.click();
+  log('saved program.mint8eff', 'success');
+}
+
+function loadFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('code').value = ev.target.result;
+    resetAll();
+    log(`loaded ${file.name}`, 'success');
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+updateMemory();
+updateStats();
+log('efficiency interpreter ready. write .mint8eff code and run.', 'success');
 </script>
 </body>
 </html>
