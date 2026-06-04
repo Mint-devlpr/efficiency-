@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Efficiency — .mint8eff interpreter</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --panel: #111111;
+    --border: #1e1e1e;
+    --mint: #00ffb3;
+    --mint-dim: #00ffb322;
+    --mint-mid: #00ffb366;
+    --red: #ff3c3c;
+    --yellow: #ffe94d;
+    --text: #c8c8c8;
+    --dim: #444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 24px 32px 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+
+  header h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.4rem;
+    color: var(--mint);
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+
+  header span {
+    color: var(--dim);
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    flex: 1;
+    gap: 0;
+  }
+
+  .panel {
+    border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-label {
+    padding: 10px 16px;
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    color: var(--dim);
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+
+  textarea {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--mint);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 1rem;
+    padding: 16px;
+    resize: none;
+    line-height: 1.8;
+    min-height: 220px;
+  }
+
+  textarea::placeholder { color: var(--dim); }
+
+  .controls {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  button {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.8rem;
+    letter-spacing: 2px;
+    padding: 8px 20px;
+    border: 1px solid var(--mint);
+    background: transparent;
+    color: var(--mint);
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s;
+  }
+
+  button:hover { background: var(--mint-dim); }
+
+  button.danger {
+    border-color: var(--red);
+    color: var(--red);
+  }
+
+  button.danger:hover { background: #ff3c3c22; }
+
+  .speed-label {
+    color: var(--dim);
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    margin-left: auto;
+  }
+
+  input[type=range] {
+    accent-color: var(--mint);
+    width: 80px;
+  }
+
+  /* memory panel */
+  #memory-panel {
+    border-right: none;
+    overflow-y: auto;
+  }
+
+  #memory-grid {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .mem-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 8px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    font-size: 0.85rem;
+  }
+
+  .mem-cell.active {
+    border-color: var(--mint);
+    background: var(--mint-dim);
+  }
+
+  .mem-cell.changed {
+    border-color: var(--yellow);
+    background: #ffe94d11;
+  }
+
+  .mem-addr {
+    color: var(--dim);
+    min-width: 48px;
+  }
+
+  .mem-val {
+    color: var(--text);
+    flex: 1;
+  }
+
+  .mem-cell.active .mem-val { color: var(--mint); }
+  .mem-cell.changed .mem-val { color: var(--yellow); }
+
+  .mem-ptr {
+    color: var(--mint);
+    font-size: 0.7rem;
+  }
+
+  /* log panel */
+  #log-panel {
+    grid-column: 1 / 3;
+    border-right: none;
+    border-bottom: none;
+    max-height: 200px;
+  }
+
+  #log {
+    padding: 12px 16px;
+    overflow-y: auto;
+    max-height: 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .log-line {
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--dim);
+  }
+
+  .log-line.info { color: var(--text); }
+  .log-line.success { color: var(--mint); }
+  .log-line.error { color: var(--red); }
+  .log-line.step { color: #777; }
+
+  .ip-indicator {
+    color: var(--dim);
+    font-size: 0.7rem;
+    margin-left: auto;
+    padding: 10px 16px;
+    letter-spacing: 1px;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    padding: 6px 16px;
+    border-top: 1px solid var(--border);
+    gap: 20px;
+    font-size: 0.7rem;
+    color: var(--dim);
+    letter-spacing: 1px;
+  }
+
+  .status-bar span { color: var(--text); }
+
+  /* instruction ref */
+  .ref-panel {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    overflow-y: auto;
+  }
+
+  .ref-row {
+    display: flex;
+    gap: 12px;
+    font-size: 0.75rem;
+    padding: 3px 0;
+    border-bottom: 1px solid #1a1a1a;
+  }
+
+  .ref-num {
+    color: var(--mint);
+    min-width: 20px;
+  }
+
+  .ref-desc { color: #888; }
+
+  @keyframes flash {
+    0% { background: var(--mint-mid); }
+    100% { background: var(--mint-dim); }
+  }
+
+  .mem-cell.flash { animation: flash 0.3s ease-out; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>EFFICIENCY</h1>
+  <span>.mint8eff interpreter // 8 instructions // parasitic runtime</span>
+</header>
+
+<div class="workspace">
+
+  <!-- code editor -->
+  <div class="panel">
+    <div class="panel-label">program // .mint8eff</div>
+    <textarea id="code" placeholder="# write your efficiency program here
+# instructions 1-8, comments with #
+# anything else is a raw value loaded into memory
+# example: put 3 in cell 0, move up, put 5 in cell 1
+3 3 3
+1
+3 3 3 3 3"></textarea>
+    <div class="controls">
+      <button onclick="runFull()">▶ RUN</button>
+      <button onclick="stepOnce()">⏭ STEP</button>
+      <button onclick="resetAll()">↺ RESET</button>
+      <button class="danger" onclick="stopRun()">■ STOP</button>
+      <span class="speed-label">speed</span>
+      <input type="range" id="speed" min="1" max="500" value="100">
+    </div>
+  </div>
+
+  <!-- memory display -->
+  <div class="panel" id="memory-panel">
+    <div class="panel-label">memory state</div>
+    <div id="memory-grid"></div>
+    <div class="status-bar">
+      <div>IP <span id="stat-ip">0</span></div>
+      <div>PTR <span id="stat-ptr">0</span></div>
+      <div>STEPS <span id="stat-steps">0</span></div>
+      <div>MEM[PTR] <span id="stat-val">0</span></div>
+    </div>
+  </div>
+
+  <!-- log -->
+  <div class="panel" id="log-panel">
+    <div class="panel-label" style="display:flex;justify-content:space-between">
+      <span>execution log</span>
+      <span style="cursor:pointer;padding-right:4px" onclick="clearLog()">clear</span>
+    </div>
+    <div id="log"></div>
+  </div>
+
+</div>
+
+<script>
+  const MEMORY_SIZE = 256;
+
+  let memory = new Array(MEMORY_SIZE).fill(0n);
+  let pointer = 0;
+  let ip = 0;
+  let program = [];
+  let steps = 0;
+  let running = false;
+  let runInterval = null;
+  let prevMemory = new Array(MEMORY_SIZE).fill(0n);
+
+  const INSTRUCTIONS = {
+    1: 'PTR++',
+    2: 'PTR--',
+    3: 'MEM[PTR]++',
+    4: 'MEM[PTR]--',
+    5: 'LOOP START',
+    6: 'LOOP END',
+    7: 'JUMP → MEM[PTR]',
+    8: 'BRANCH (if/else jump)'
+  };
+
+  function parseProgram(src) {
+    const lines = src.split('\n');
+    const values = [];
+    for (let line of lines) {
+      const noComment = line.split('#')[0];
+      const tokens = noComment.trim().split(/\s+/).filter(t => t !== '');
+      for (let t of tokens) {
+        const n = parseInt(t, 10);
+        if (!isNaN(n)) values.push(BigInt(n));
+      }
+    }
+    return values;
+  }
+
+  function resetAll() {
+    stopRun();
+    memory = new Array(MEMORY_SIZE).fill(0n);
+    prevMemory = new Array(MEMORY_SIZE).fill(0n);
+    pointer = 0;
+    ip = 0;
+    steps = 0;
+    program = [];
+    updateMemoryDisplay();
+    updateStats();
+    log('reset.', 'info');
+  }
+
+  function log(msg, type = 'step') {
+    const el = document.getElementById('log');
+    const line = document.createElement('div');
+    line.className = `log-line ${type}`;
+    line.textContent = `> ${msg}`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+
+  function clearLog() {
+    document.getElementById('log').innerHTML = '';
+  }
+
+  function updateStats() {
+    document.getElementById('stat-ip').textContent = ip;
+    document.getElementById('stat-ptr').textContent = pointer;
+    document.getElementById('stat-steps').textContent = steps;
+    document.getElementById('stat-val').textContent = memory[pointer].toString();
+  }
+
+  function updateMemoryDisplay() {
+    const grid = document.getElementById('memory-grid');
+    grid.innerHTML = '';
+
+    // show all non-zero cells plus pointer and neighbours
+    const toShow = new Set();
+    toShow.add(pointer);
+    for (let i = 0; i < MEMORY_SIZE; i++) {
+      if (memory[i] !== 0n) toShow.add(i);
+    }
+
+    if (toShow.size === 0) {
+      const empty = document.createElement('div');
+      empty.style.color = 'var(--dim)';
+      empty.style.padding = '12px';
+      empty.style.fontSize = '0.75rem';
+      empty.textContent = 'memory is empty';
+      grid.appendChild(empty);
+      return;
+    }
+
+    const sorted = Array.from(toShow).sort((a, b) => a - b);
+    for (let idx of sorted) {
+      const cell = document.createElement('div');
+      cell.className = 'mem-cell';
+      if (idx === pointer) cell.classList.add('active');
+      else if (memory[idx] !== prevMemory[idx]) cell.classList.add('changed');
+
+      cell.innerHTML = `
+        <span class="mem-addr">[${idx}]</span>
+        <span class="mem-val">${memory[idx].toString()}</span>
+        ${idx === pointer ? '<span class="mem-ptr">◀ PTR</span>' : ''}
+      `;
+      grid.appendChild(cell);
+    }
+  }
+
+  function step() {
+    if (ip >= program.length) {
+      log('execution complete.', 'success');
+      stopRun();
+      return false;
+    }
+
+    prevMemory = [...memory];
+    const instr = Number(program[ip]);
+
+    const instrName = INSTRUCTIONS[instr] || `RAW VALUE ${instr}`;
+    log(`[${ip}] ${instrName}`, 'step');
+
+    switch (instr) {
+      case 1:
+        pointer++;
+        if (pointer >= MEMORY_SIZE) { log('error: pointer out of bounds', 'error'); stopRun(); return false; }
+        ip++;
+        break;
+
+      case 2:
+        pointer--;
+        if (pointer < 0) { log('error: pointer out of bounds', 'error'); stopRun(); return false; }
+        ip++;
+        break;
+
+      case 3:
+        memory[pointer]++;
+        ip++;
+        break;
+
+      case 4:
+        memory[pointer]--;
+        ip++;
+        break;
+
+      case 5:
+        if (memory[pointer] === 0n) {
+          let depth = 1; ip++;
+          while (depth > 0 && ip < program.length) {
+            if (Number(program[ip]) === 5) depth++;
+            if (Number(program[ip]) === 6) depth--;
+            ip++;
+          }
+        } else { ip++; }
+        break;
+
+      case 6:
+        if (memory[pointer] !== 0n) {
+          let depth = 1; ip--;
+          while (depth > 0 && ip >= 0) {
+            if (Number(program[ip]) === 6) depth++;
+            if (Number(program[ip]) === 5) depth--;
+            ip--;
+          }
+          ip++;
+        } else { ip++; }
+        break;
+
+      case 7:
+        ip = Number(memory[pointer]);
+        break;
+
+      case 8:
+        if (ip + 3 >= program.length) { log('error: instruction 8 needs 3 following values', 'error'); stopRun(); return false; }
+        if (memory[pointer] === program[ip + 1]) {
+          ip = Number(program[ip + 2]);
+        } else {
+          ip = Number(memory[pointer + Number(program[ip + 3])]);
+        }
+        break;
+
+      default:
+        memory[pointer] = BigInt(instr);
+        ip++;
+        break;
+    }
+
+    steps++;
+    updateMemoryDisplay();
+    updateStats();
+    return true;
+  }
+
+  function stepOnce() {
+    if (program.length === 0) {
+      program = parseProgram(document.getElementById('code').value);
+      log(`loaded ${program.length} values.`, 'info');
+    }
+    step();
+  }
+
+  function runFull() {
+    stopRun();
+    program = parseProgram(document.getElementById('code').value);
+    memory = new Array(MEMORY_SIZE).fill(0n);
+    prevMemory = new Array(MEMORY_SIZE).fill(0n);
+    pointer = 0;
+    ip = 0;
+    steps = 0;
+    log(`loaded ${program.length} values. running...`, 'info');
+    updateMemoryDisplay();
+    updateStats();
+
+    running = true;
+    const delay = () => 501 - parseInt(document.getElementById('speed').value);
+    runInterval = setInterval(() => {
+      if (!running) return;
+      const cont = step();
+      if (!cont) stopRun();
+    }, delay());
+  }
+
+  function stopRun() {
+    running = false;
+    if (runInterval) { clearInterval(runInterval); runInterval = null; }
+  }
+
+  // init
+  updateMemoryDisplay();
+  updateStats();
+  log('efficiency interpreter ready. write .mint8eff code and run.', 'success');
+</script>
+</body>
+</html>
